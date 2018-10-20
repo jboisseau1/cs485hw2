@@ -14,14 +14,14 @@ class RigidBodyPlanner
 {
 public:
     RigidBodyPlanner(RigidBodySimulator * const simulator);
-            
+
     ~RigidBodyPlanner(void);
 
     /*
      * This is the function that you should implement.
-     * This function needs to compute by how much the position (dx, dy) 
-     * and orientation (dtheta) should change so that the robot makes a small 
-     * move toward the goal while avoiding obstacles, 
+     * This function needs to compute by how much the position (dx, dy)
+     * and orientation (dtheta) should change so that the robot makes a small
+     * move toward the goal while avoiding obstacles,
      * as guided by the potential field.
      *
      * You have access to the simulator.
@@ -30,7 +30,13 @@ public:
      *
      */
     RigidBodyMove ConfigurationMove(void);
-    
+    double RepulsiveForce(double, double);
+
+    double AttractiveForce(double, double);
+    double TranspoedJacobian(double, double);
+    double distanceBetweenPoints(double,double,double,double);
+
+
 protected:
     RigidBodySimulator *m_simulator;
 };
