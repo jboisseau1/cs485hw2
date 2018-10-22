@@ -2,6 +2,7 @@
 #define RIGID_BODY_PLANNER_HPP_
 
 #include "RigidBodySimulator.hpp"
+#include <vector>
 
 struct RigidBodyMove
 {
@@ -30,12 +31,12 @@ public:
      *
      */
     RigidBodyMove ConfigurationMove(void);
-    double RepulsiveForce(double, double);
-
-    double AttractiveForce(double, double);
-    double TranspoedJacobian(double, double);
-    double distanceBetweenPoints(double,double,double,double);
-
+    std::vector<double> RepulsiveForce(double, double);
+    std::vector<double> AttractiveForce(double, double);
+    std::vector<double> TranspoedJacobianAB(double, double);
+	double DistanceToObs(double, double, double, double);
+	double step;
+	double threshold;
 
 protected:
     RigidBodySimulator *m_simulator;
