@@ -20,25 +20,25 @@ RigidBodyMove RigidBodyPlanner::ConfigurationMove(void)
         RigidBodyMove move;
 
         //start by taking all the vertices of our robot (this is a vector)
-		std::vector<double> vertices = m_simulator->GetRobotVertices();
+	       const double* vertices = m_simulator->GetRobotVertices();
         //calculate attractive force for each vertices (basically have much the goal is pulling on it)
-		std::vector<double> totalForces(vertices.size(), 0);
+		std::vector<double> totalForces(sizeof(vertices), 0);
 		std::vector<double> Frep(2, 0);
 		std::vector<double> Fatt(2, 0);
 		int i;
-		for (i = 0; i < vertices.size(); i += 2) {
-		
-			temp = AttractiveForce(vertices[i], vertices[i+1]);
-			temp2 = RepulsiveForce(vertices[i], vertices[i + 1]);
+		for (i = 0; i < sizeof(vertices); i += 2) {
+
+			Fatt = AttractiveForce(vertices[i], vertices[i+1]);
+			Frep = RepulsiveForce(vertices[i], vertices[i + 1]);
 			totalForces[i] = Fatt[0] + Frep[0];
 			totalForces[i + 1] = Fatt[1] + Frep[0];
 
-			
+
 		}
 		//make helper function to create a seperate transposed jacobian for each vertex (they are all control points i think one long vector of size 9 will work fine for our purposes.)
-		std::vector<double> jacobians(vertices.size());
+		std::vector<double> jacobians(sizeof(vertices));
 		std::vector<double> temp(2, 0);
-		for (i = 0; i < vertices.size(); i+=2) {
+		for (i = 0; i < sizeof(vertices); i+=2) {
 			 temp = TranspoedJacobianAB(vertices[i], vertices[i + 1]);
 			 jacobians[i] = temp[0];
 			 jacobians[i + 1] = temp[1];
@@ -46,7 +46,7 @@ RigidBodyMove RigidBodyPlanner::ConfigurationMove(void)
 		double dx = 0;
 		double dy = 0;
 		double dtheta = 0;
-		for (i = 0; vertices.size(); i+=2) {
+		for (i = 0; sizeof(vertices); i+=2) {
 			dx += totalForces[i];
 			dy += totalForces[i + 1];
 			dtheta += jacobians[i] * totalForces[i] + jacobians[i+1] * totalForces[i+1];
@@ -56,11 +56,13 @@ RigidBodyMove RigidBodyPlanner::ConfigurationMove(void)
 		dy = dy / mag;
 		dtheta = dtheta / mag;
 
-		move = {dx*step, dy*step, dtheta*step};
+    move.m_dx = dx*step;
+    move.m_dy = dy*step;
+    move.m_dtheta = dtheta*step;
         //we'll make a helper function that returns a vector? of size 2 (really just a 2 by 1 matrix)that calculates for a specific point and then loop that over all the control pints
         //calculate the repulsive force of each obstacle on each control point (remember that there is a threshold you must account for - force is 0 outside of that threshold)
         //helper function that claculates force on a point (vecotr?) then a nested for loop to iterate over all obstacles and for every control point.
-        
+
         //sum the attractive and repulsive forces for each control point seperately
         //matrix multiply the transposed jacobian (3 by 2) with the full force (2 by 1) to make a final vector (3 by 1) containing the movement of the control point in the x , y , and theta
         //loop over all the cotrol points and sum up the movements for each to recieve the final movement and return it as our move
@@ -74,11 +76,11 @@ RigidBodyMove RigidBodyPlanner::ConfigurationMove(void)
 }
 //takes a control point (Cx, Cy) and returns the goals force on it. --------------JIMMY
 std::vector<double> RigidBodyPlanner::AttractiveForce(double cx, double cy) {
-		
+
 	std::vector<double> returnVector(2, 0);
 
-	returnVector[0] = m_simulator->GetGoalCenterX - cx;
-	returnVector[1] = m_simulator->GetGoalCenterY - cy;
+	returnVector[0] = m_simulator->GetGoalCenterX() - cx;
+	returnVector[1] = m_simulator->GetGoalCenterY() - cy;
 	return returnVector;
 
 
@@ -125,10 +127,11 @@ std::vector<double> RigidBodyPlanner::RepulsiveForce(double cx, double cy) {
 //returns a vector of size 2 of the jacobian of the control point transposed ---------------PABLO
 std::vector<double> RigidBodyPlanner::TranspoedJacobianAB(double cx, double cy) {
 	double theta = m_simulator->GetRobotTheta();
-	std::vector<double> TJacobian = {-cx * sin(theta) - cy * cos(theta), cx * cos(theta) - cy * sin(theta)) };
+	std::vector<double> TJacobianAB(2, 0);
+TJacobianAB[0]  = (-cx * sin(theta) - cy * cos(theta));
+TJacobianAB[1] =  (cx * cos(theta) - cy * sin(theta));
 	return TJacobianAB;
 }
 double RigidBodyPlanner::DistanceToObs(double cx, double cy, double ox, double oy) {
 	return sqrt((cx-ox)*(cx-ox) + (cy-oy)*(cy-oy));
 }
-
