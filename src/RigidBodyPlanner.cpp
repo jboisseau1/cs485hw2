@@ -3,13 +3,13 @@
 RigidBodyPlanner::RigidBodyPlanner(RigidBodySimulator * const simulator)
 {
         m_simulator = simulator;
+        step = 0.1; //TODO:figure out correct step size
+        threshold = 5.0; //TODO: figure out threshold
 }
 
 RigidBodyPlanner::~RigidBodyPlanner(void)
 {
         //do not delete m_simulator
-	step = 0.1; //TODO:figure out correct step size
-	threshold = 4.5; //TODO: figure out threshold
 
 }
 
@@ -30,9 +30,11 @@ RigidBodyMove RigidBodyPlanner::ConfigurationMove(void)
 
 			Fatt = AttractiveForce(vertices[i], vertices[i+1]);
 			Frep = RepulsiveForce(vertices[i], vertices[i + 1]);
-			totalForces[i] = Fatt[0] + Frep[0];
-			totalForces[i + 1] = Fatt[1] + Frep[0];
+			totalForces[i] += Fatt[0] + Frep[0];
+			totalForces[i + 1] += Fatt[1] + Frep[1] ;
 
+      printf("rx:%lf ry:%lf\n", Frep[0] + Frep[1]);
+      printf("ax:%lf ay:%lf\n", Fatt[0] + Fatt[1]);
 
 		}
 		//make helper function to create a seperate transposed jacobian for each vertex (they are all control points i think one long vector of size 9 will work fine for our purposes.)
@@ -51,14 +53,17 @@ RigidBodyMove RigidBodyPlanner::ConfigurationMove(void)
 			dy += totalForces[i + 1];
 			dtheta += jacobians[i] * totalForces[i] + jacobians[i+1] * totalForces[i+1];
 		}
+
 		double mag = sqrt(dx*dx + dy * dy + dtheta * dtheta);
 		dx = dx / mag;
 		dy = dy / mag;
 		dtheta = dtheta / mag;
 
+
     move.m_dx = dx*step;
     move.m_dy = dy*step;
     move.m_dtheta = dtheta*step;
+
         //we'll make a helper function that returns a vector? of size 2 (really just a 2 by 1 matrix)that calculates for a specific point and then loop that over all the control pints
         //calculate the repulsive force of each obstacle on each control point (remember that there is a threshold you must account for - force is 0 outside of that threshold)
         //helper function that claculates force on a point (vecotr?) then a nested for loop to iterate over all obstacles and for every control point.
@@ -99,8 +104,6 @@ std::vector<double> RigidBodyPlanner::RepulsiveForce(double cx, double cy) {
          * So the x-coord of the i-th vertex is at index 2 * i
          * and the y-coord of the i-th vertex is at index 2 * i + 1
          */
-        const double *vertices = m_simulator->GetRobotVertices();
-        double forceTotal = 0.0;
         /**
          *@brief Returns closest point on the i-th circle obstacle to point [x, y]
            Point ClosestPointOnObstacle(const int i, const double x, const double y);
@@ -110,15 +113,15 @@ std::vector<double> RigidBodyPlanner::RepulsiveForce(double cx, double cy) {
 		Point o_i;
 
         if(numberOfObstacles>0) {
-                for (size_t i = 0; i < numberOfObstacles; i++) { //terates over obstacles -- Urep(q)
+                for (size_t i = 0; i < numberOfObstacles; i++) {
 					o_i = m_simulator->ClosestPointOnObstacle(i, cx, cy);
-					if (DistanceToObs(cx,cy,o_i.m_x,o_i.m_y) >= threshold) {
-						returnVector[0] = cx - o_i.m_x;
-						returnVector[1] = cy - o_i.m_y;
+					if (DistanceToObs(cx,cy,o_i.m_x,o_i.m_y) <= threshold) {
+						returnVector[0] += cx - o_i.m_x;
+						returnVector[1] += cy - o_i.m_y;
 					}
 					else {
-						returnVector[0] = 0;
-						returnVector[1] = 0;
+						returnVector[0] += 0;
+						returnVector[1] += 0;
 					}
                 }
         }
@@ -130,6 +133,7 @@ std::vector<double> RigidBodyPlanner::TranspoedJacobianAB(double cx, double cy) 
 	std::vector<double> TJacobianAB(2, 0);
 	TJacobianAB[0]  = (-cx * sin(theta) - cy * cos(theta));
 	TJacobianAB[1] =  (cx * cos(theta) - cy * sin(theta));
+  // printf("Jx%lf Jy:%lf\n", TJacobianAB[0],TJacobianAB[1]);
 	return TJacobianAB;
 }
 double RigidBodyPlanner::DistanceToObs(double cx, double cy, double ox, double oy) {
