@@ -36,6 +36,7 @@ public:
     std::vector<double> TranspoedJacobianAB(double, double);
 	double DistanceToObs(double, double, double, double);
 	double step;
+  double tStep;
 	double threshold;
 
 protected:
