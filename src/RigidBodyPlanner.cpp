@@ -4,7 +4,7 @@ RigidBodyPlanner::RigidBodyPlanner(RigidBodySimulator * const simulator)
 {
         m_simulator = simulator;
         step = 0.03; //TODO:figure out correct step size
-        threshold = 1.5; //TODO: figure out threshold
+        threshold = 2.0; //TODO: figure out threshold
         tStep = 0.01;
 
 }
