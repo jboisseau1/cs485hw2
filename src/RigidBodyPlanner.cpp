@@ -1,12 +1,18 @@
 #include "RigidBodyPlanner.hpp"
 
+#define MIN 0.005
+#define MINTHETA 0
+
 RigidBodyPlanner::RigidBodyPlanner(RigidBodySimulator * const simulator)
 {
         m_simulator = simulator;
         step = 0.03; //TODO:figure out correct step size
         threshold = 2.0; //TODO: figure out threshold
         tStep = 0.01;
-
+        escape = false;
+        multiplier = 1;
+        escapecntr = 401;
+        
 }
 
 RigidBodyPlanner::~RigidBodyPlanner(void)
@@ -20,28 +26,58 @@ RigidBodyMove RigidBodyPlanner::ConfigurationMove(void)
 
 {
         RigidBodyMove move;
+        //check to see if your in escape route
+        /*if(escape == true){
+            escapecntr++;
+            if(escapecntr > 100){
+                multiplier = 1;
+                escapecntr = 0;
+                escape = false;
+            }
+
+            //get the distance to goal and angle,
+            //invert that, the move it to the left or right
+            //calculate move based on temp goal destination
+
+            double goalX = m_simulator->GetGoalCenterX();
+            double goalY = m_simulator->GetGoalCenterY();
+            double robotX = m_simulator->GetRobotX();
+            double robotY = m_simulator->GetRobotY();
+            double dis = DistanceToObs(robotX, robotY, goalX, goalY);
+
+            move.m_dx = dx*step;
+            move.m_dy = dy*step;
+            move.m_dtheta = dtheta*tStep;
+
+            return move;
+        }
+        else{*/
 
         //start by taking all the vertices of our robot (this is a vector)
         const double* vertices = m_simulator->GetRobotVertices();
-        printf("numvert %lu\n", sizeof(vertices)/2);
+        //printf("numvert %lu\n", sizeof(vertices)/2);
         //calculate attractive force for each vertices (basically have much the goal is pulling on it)
         std::vector<double> totalForces(sizeof(vertices), 0);
         std::vector<double> Frep(2, 0);
         std::vector<double> Fatt(2, 0);
         int i;
         for (i = 0; i < sizeof(vertices); i += 2) {
-
-                Fatt = AttractiveForce(vertices[i], vertices[i+1]);
+                if(escape == true){
+                    
+                    Fatt = AttractiveForceTemp(vertices[i], vertices[i+1]);
+                }else{
+                    Fatt = AttractiveForce(vertices[i], vertices[i+1]);
+                }
                 Frep = RepulsiveForce(vertices[i], vertices[i+1]);
-                totalForces[i] = Fatt[0] + Frep[0];
-                totalForces[i + 1] = Fatt[1] + Frep[1];
+                totalForces[i] = (Fatt[0] + Frep[0]);// * multiplier;
+                totalForces[i + 1] = (Fatt[1] + Frep[1]);// * multiplier;
 
                 // printf("rx:%lf ry:%lf\n", Frep[0] + Frep[1]);
                 // printf("ax:%lf ay:%lf\n", Fatt[0] + Fatt[1]);
 
         }
 
-        // printf("tx:%lf ty:%lf\n", totalForces[0] + totalForces[1]);
+         //printf("tx:%lf ty:%lf\n", totalForces[0] + totalForces[1]);
 
         //make helper function to create a seperate transposed jacobian for each vertex (they are all control points i think one long vector of size 9 will work fine for our purposes.)
         std::vector<double> jacobians(sizeof(vertices));
@@ -69,8 +105,19 @@ RigidBodyMove RigidBodyPlanner::ConfigurationMove(void)
         move.m_dx = dx*step;
         move.m_dy = dy*step;
         move.m_dtheta = dtheta*tStep;
+        if(escapecntr > 100){
+            printf("\n\n YAS\n\n");
+        }
+        if((move.m_dx >= -MIN && move.m_dx <= MIN) && (move.m_dy <= MIN && move.m_dy >= -MIN) && escapecntr > 400){ //&& move.m_dtheta <= MINTHETA){
+            printf("\nGOING INTO ESCAPE MODE!!!!!!!!!\n\n");
+            escapecntr = 0;
+            escape = true;
 
-        // printf("dx:%lf dy:%lf\n",move.m_dx,move.m_dy );
+            //multiplier = -1;
+
+        }
+
+        printf("dx:%lf dy:%lf theta:%lf\n",move.m_dx,move.m_dy,move.m_dtheta);
         //we'll make a helper function that returns a vector? of size 2 (really just a 2 by 1 matrix)that calculates for a specific point and then loop that over all the control pints
         //calculate the repulsive force of each obstacle on each control point (remember that there is a threshold you must account for - force is 0 outside of that threshold)
         //helper function that claculates force on a point (vecotr?) then a nested for loop to iterate over all obstacles and for every control point.
@@ -83,8 +130,22 @@ RigidBodyMove RigidBodyPlanner::ConfigurationMove(void)
         //add some functionality to get out of local minimums
         //
         //add your implementation
-
+        if(escape == true){
+            double goalX = -1*m_simulator->GetGoalCenterX();
+            double goalY = m_simulator->GetGoalCenterY();
+            double robotX = m_simulator->GetRobotX();
+            double robotY = m_simulator->GetRobotY();
+            double dis = DistanceToObs(robotX, robotY, goalX, goalY);
+            printf("distance to goal %lf\n", dis);
+            if(dis < 5.0){
+                escape = false;
+            }
+        }
+        else{
+            escapecntr++;
+        }
         return move;
+   //}
 }
 //takes a control point (Cx, Cy) and returns the goals force on it. --------------JIMMY
 std::vector<double> RigidBodyPlanner::AttractiveForce(double cx, double cy) {
@@ -98,7 +159,25 @@ std::vector<double> RigidBodyPlanner::AttractiveForce(double cx, double cy) {
         returnVector[0] /= mag;
         returnVector[1] /= mag;
 
-        printf("ax: %lf ay: %lf\n", returnVector[0], returnVector[1]);
+        //printf("ax: %lf ay: %lf\n", returnVector[0], returnVector[1]);
+        return returnVector;
+
+
+
+}
+std::vector<double> RigidBodyPlanner::AttractiveForceTemp(double cx, double cy) {
+
+        std::vector<double> returnVector(2, 0);
+
+        //old
+        returnVector[0] = -1*m_simulator->GetGoalCenterX() - cx;
+        returnVector[1] = m_simulator->GetGoalCenterY() - cy;
+
+        double mag  = sqrt(returnVector[0]*returnVector[0] + returnVector[1]*returnVector[1]);
+        returnVector[0] /= mag;
+        returnVector[1] /= mag;
+
+        //printf("ax: %lf ay: %lf\n", returnVector[0], returnVector[1]);
         return returnVector;
 
 
@@ -111,7 +190,7 @@ std::vector<double> RigidBodyPlanner::AttractiveForce(double cx, double cy) {
 //function with a more complex structure in the configurationmove ----------------JACOB
 std::vector<double> RigidBodyPlanner::RepulsiveForce(double cx, double cy) {
         int numberOfObstacles = m_simulator->GetNrObstacles();
-        printf("numobs %d\n", numberOfObstacles);
+        //printf("numobs %d\n", numberOfObstacles);
         std::vector<double> returnVector(2, 0);
         /*
          * Vertices are stored consecutively in the vector
@@ -147,7 +226,7 @@ std::vector<double> RigidBodyPlanner::RepulsiveForce(double cx, double cy) {
                         }
                 }
                 if(returnVector[0]!=0 && returnVector[1]!=0){
-                  printf("x:%lf, y:%lf\n", returnVector[0], returnVector[1]);
+                  //printf("x:%lf, y:%lf\n", returnVector[0], returnVector[1]);
 
                 }
         }
