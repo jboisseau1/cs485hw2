@@ -33,7 +33,7 @@ public:
     RigidBodyMove ConfigurationMove(void);
     std::vector<double> RepulsiveForce(double, double);
     std::vector<double> AttractiveForce(double, double);
-    std::vector<double> AttractiveForceTemp(double, double);
+    std::vector<double> AttractiveForceToEscapeGoal(double, double,double, double);
     std::vector<double> TranspoedJacobianAB(double, double);
 	double DistanceToObs(double, double, double, double);
 	double step;
@@ -43,6 +43,9 @@ public:
     bool reachedTempGoal;
     int multiplier; //remove?
     int escapecntr; //remove?
+    double escapeX;
+    double escapeY;
+    double escapeThreshold;
 
 protected:
     RigidBodySimulator *m_simulator;
